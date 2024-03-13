@@ -1,0 +1,101 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: |
+  This template deploys a Private REST API Gateway and Lambda FUNCTION and integrates the function with Gateway
+
+# Private API GATEWAY USING AWS::Serverless::Api
+
+Resources:
+  ApiGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: production
+      MethodSettings:
+        - HttpMethod: GET
+          ResourcePath: /
+      Auth:
+        ResourcePolicy:
+          CustomStatements: {
+              Effect: 'Allow',
+              Action: 'execute-api:Invoke', 
+              Resource: ['execute-api:/*/*/*'],
+              Principal: '*'
+            }
+      EndpointConfiguration:
+        Type: PRIVATE
+        VPCEndpointIds:
+          - !ImportValue VPCEndpointID
+
+
+# Lambda function integrated with Above Private REST API
+
+  ApiFunction:   
+    Type: AWS::Serverless::Function
+    Properties:
+       Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /
+            Method: get
+            RestApiId:
+              Ref: ApiGatewayApi
+       Runtime: nodejs16.x
+       Handler: index.handler
+       InlineCode: |
+         exports.handler = async (event) => {
+            // TODO implement
+            const response = {
+              statusCode: 200,
+              body: JSON.stringify('Hello from Lambda!'),
+            };
+            return response;
+          };
+
+ 
+  
+  FunctionServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - !Join 
+          - ''
+          - - 'arn:'
+            - !Ref 'AWS::Partition'
+            - ':iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+
+#  Integration using APIGatewayV2
+  
+  MyApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: MyApi
+      ProtocolType: HTTP
+      Description: My API description
+
+  MyIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: MyApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ApiFunction}
+      IntegrationMethod: GET
+      PayloadFormatVersion: "2.0"
+  
+  MyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MyApi
+      RouteKey: "$default"
+      Target: !Sub integrations/${MyIntegration}
+

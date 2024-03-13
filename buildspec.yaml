@@ -1,0 +1,13 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - echo Running Pre Build process
+  build:
+    commands:
+      - echo Build starts
+      - echo Hellow World
+    post_build:
+      commands:
+        - echo Build completed  
+
