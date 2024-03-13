@@ -1,0 +1,302 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+#Transform: AWS::Serverless-2016-10-31
+Description: |
+  This template deploys a VPC, with a pair of public, private subnets spread
+  across two Availability Zones.
+
+Parameters:
+
+  VPCCIDR:
+    Description: "Please enter the IP range (CIDR notation) for this VPC"
+    Type: String
+    Default: 172.32.0.0/16
+
+  PublicSubnet1CIDR:
+    Description: "Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone"
+    Type: String
+    Default: 172.32.0.0/24
+
+  PublicSubnet2CIDR:
+    Description: "Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone"
+    Type: String
+    Default: 172.32.1.0/24
+
+  PrivateSubnet1CIDR:
+    Description: "Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone"
+    Type: String
+    Default: 172.32.2.0/24
+
+  PrivateSubnet2CIDR:
+    Description: "Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone"
+    Type: String
+    Default: 172.32.3.0/24
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-VPC
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}
+
+  GatewayToInternet:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # PublicSubnets, RouteTables and routes
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public
+
+  PublicSubnetsRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # Public Subnet 1
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public-subnet-(AZ1)
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  # Public Subnet 2
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-public-subnet-(AZ2)
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+
+  # Private Subnet 1
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-subnet-(AZ1)
+
+  PrivateSubnet1RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-az1
+
+ # PrivateSubnet1Route:
+ #   Type: AWS::EC2::Route
+ #   Properties:
+ #     RouteTableId: !Ref PrivateSubnet1RouteTable
+ #     DestinationCidrBlock: 0.0.0.0/0
+    #  NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateSubnet1RouteTable
+
+
+
+  # Private Subnet 2
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-subnet-(AZ2)
+
+  PrivateSubnet2RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-private-az2
+
+  #PrivateSubnet2Route:
+  #  Type: AWS::EC2::Route
+  #  Properties:
+  #    RouteTableId: !Ref PrivateSubnet2RouteTable
+  #    DestinationCidrBlock: 0.0.0.0/0
+     # NatGatewayId: !Ref NatGateway
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateSubnet2RouteTable
+
+  VPCESecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: '-1'
+      SecurityGroupIngress:
+        - CidrIp: !GetAtt 
+            - VPC
+            - CidrBlock
+          Description: !Join 
+            - ''
+            - - 'from '
+              - !GetAtt 
+                - VPC
+                - CidrBlock
+              - ':443'
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+      VpcId: !Ref VPC
+
+# Interface VPC Endpoints for Private REST API endpoints
+
+  VPCEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      ServiceName: !Join 
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .execute-api
+      VpcId: !Ref VPC
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt 
+          - VPCESecurityGroup
+          - GroupId
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      VpcEndpointType: Interface
+
+# CIDR Range and IDs of VPC, PublicSubnets and Private Subnets are exported
+# IDs of InternetGateway and VPC Endpoints are exported.
+
+Outputs:
+  InternetGateway:
+    Description: A reference to the IG
+    Value: !Ref InternetGateway
+
+  VPC:  
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export: 
+      Name: VPC
+
+  VPCCIDR:
+    Description: A reference to the created VPC CIDR
+    Value: !GetAtt VPC.CidrBlock
+    Export: 
+      Name: VPC-CIDR
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: PublicSubnet1
+
+  PublicSubnet1CIDR:
+    Description: A reference to the public subnet CIDR in the 1st Availability Zone
+    Value: !GetAtt PublicSubnet1.CidrBlock
+    Export:
+      Name: PublicSubnet1-CIDR
+
+
+  PublicSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+    Export:
+     Name: PublicSubnet2
+
+  PublicSubnet2CIDR:
+    Description: A reference to the public subnet CIDR in the 1st Availability Zone
+    Value: !GetAtt PublicSubnet2.CidrBlock
+    Export:
+      Name: PublicSubnet2-CIDR
+
+  PrivateSubnet1:
+    Description: A reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+    Export:
+     Name: PrivateSubnet1
+
+  PrivateSubnet1CIDR:
+    Description: A reference to the private subnet CIDR in the 1st Availability Zone
+    Value: !GetAtt PrivateSubnet1.CidrBlock
+    Export:
+      Name: PrivateSubnet1-CIDR
+
+  PrivateSubnet2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+    Export:
+     Name: PrivateSubnet2
+
+  PrivateSubnet2CIDR:
+    Description: A reference to the private subnet CIDR in the 2st Availability Zone
+    Value: !GetAtt PrivateSubnet2.CidrBlock
+    Export:
+      Name: PrivateSubnet2-CIDR
+
+
+  VpcEndpointID:
+    Description: The Vpc endpoint ID to use for your private API.
+    Value: !Ref VPCEndpoint
+    Export:
+     Name: VPCEndpointID      
+
