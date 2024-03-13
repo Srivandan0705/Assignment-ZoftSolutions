@@ -8,4 +8,4 @@ Cloudformation Template files:
 
 2) **Assmnt-LambdaAPI.yaml** - This template deploys a Private REST API Gateway and Lambda FUNCTION and integrates the function with Gateway
 
-3)** Buildspec.yaml** - This field contains build steps for CodeBuild
+3) **Buildspec.yaml** - This field contains build steps for CodeBuild
