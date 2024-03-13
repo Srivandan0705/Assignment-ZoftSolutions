@@ -1,8 +1,9 @@
 # Assignment-ZoftSolutions
 This Repository contains Cloud formation templates of VPC deployment with two public and private subnets across availability zones and also Lambda integration with API Gateway
 
-**Cloudformation Template files:
-**
+**Cloudformation Template files:**
+
+
 1) **Assmnt-VPC.yaml** - This template deploys a VPC, with a pair of public, private subnets spread across two Availability Zones.
    This template also contains Parameters for input the value while creating stack and also Outputs to export the values.
 
